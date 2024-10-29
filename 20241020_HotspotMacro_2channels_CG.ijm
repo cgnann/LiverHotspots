@@ -33,7 +33,6 @@ output = getDirectory("Output directory"); // specify where the results should b
 condition = getString("Set a condition that you will use for saving; e.g. 1hpi_CD3_CD8","");
 // pop up window that will allow you to input the markers in the images
 marker1 = getString("Provide marker 1; e.g. CD3","");
-marker2 = getString("And now marker 2; e.g. CD8","");
 
 processFolder(input);
 print("Finished Processing");
@@ -75,14 +74,15 @@ function processFile(input, output, file) {
 	}
 	
 	// when all three channels are open we start processing the image
-    if(endsWith(filewosuffix, "ch02")) {
+    if(endsWith(filewosuffix, "ch01")) {
 		// get useful information from the filename
 		indexOfChannel = indexOf(filewosuffix, "_ch");
 		filewochannel = substring(filewosuffix, 0, indexOfChannel); // get the filename wo channel to be able to merge the images
 		img_number = substring(filewochannel, lengthOf(filewochannel) - 1, lengthOf(filewochannel));
 		
 		// create a composite image (RGB)
-		run("Merge Channels...", "c1="+filewochannel + "_ch00.tif c2="+filewochannel + "_ch01.tif c3="+filewochannel + "_ch02.tif create"); // change the channels and colors if you want
+		run("Merge Channels...", "c1="+filewochannel + "_ch00.tif c2="+filewochannel + "_ch01.tif create"); // change the channels and colors if you want
+
     	// convert to 8 bit
     	setOption("ScaleConversions", true);
 		run("8-bit");
@@ -99,17 +99,12 @@ function processFile(input, output, file) {
 		waitForUser("Adjust the thresshold and remember the number");
 		ch2_low = getNumber("Input the threshold for channel 2; e.g. 13",0);
 		close();
-		// Now let's set the threshold (channel 3)
-		run("Duplicate...", "title=marker3 duplicate channels=3");
-		run("Grays");
-		waitForUser("Adjust the thresshold and remember the number");
-		ch3_low = getNumber("Input the threshold for channel 3; e.g. 13",0);
-		close();
+		
 		// initialize a list to store all the thresholds
-		threshold_list = newArray(ch1_low, ch2_low, ch3_low); 
+		threshold_list = newArray(ch1_low, ch2_low); 
 		
 		// define hotspot and control areas by manually drawing a region - based on dapi staining only
-		run("Duplicate...", "title=marker3 duplicate channels=3");
+		run("Duplicate...", "title=marker3 duplicate channels=2");
 		//setTool("freehand");
 		waitForUser("define hotspot region");
 		roiManager("Add");
@@ -123,6 +118,9 @@ function processFile(input, output, file) {
 		
 		// save images with the hotspot annotation and scale bar
 		run("Duplicate...", "duplicate"); //generates duplicate of current composite
+		// change color for saving --> DAPI to blue
+		Stack.setChannel(2);
+		run("Blue");
 		run("Scale Bar...", "width=50 height=[0] thickness=30 font=50 color=White background=None location=[Lower Right] horizontal bold overlay");
 		waitForUser("Adjust the brightness and contrast for visualization"); //// adjust contrast & brightness 
 		// add the hotspot annotation to the image
@@ -133,16 +131,10 @@ function processFile(input, output, file) {
 		// now save the composite and individual channels
 		saveAs("PNG", output+ filewochannel + "_composite" + ".png"); //saves all three channels
 		//get individual images
-		Stack.setActiveChannels("001");
+		Stack.setActiveChannels("01");
 		saveAs("PNG", output+ filewochannel + "_DAPI" + ".png"); //saves only the 3rd channel (DAPI)
-		Stack.setActiveChannels("100");
+		Stack.setActiveChannels("10");
 		saveAs("PNG",output+ filewochannel + "_" + marker1 + ".png");  //saves only the first channel
-		Stack.setActiveChannels("101");
-		saveAs("PNG",output+ filewochannel + "_" + marker1 + "_dapi.png");  //saves only the first channel
-		Stack.setActiveChannels("010");
-		saveAs("PNG",output+ filewochannel + "_" + marker2 + ".png");  //saves only the second channel
-		Stack.setActiveChannels("011");
-		saveAs("PNG",output+ filewochannel + "_" + marker2 + "_dapi.png");  //saves only the first channel
 		close(); /// closes the duplicate
 		
 		// Now measure all three channels
@@ -151,7 +143,7 @@ function processFile(input, output, file) {
 		roiManager("Select", newArray(0,1));
 		Stack.setDisplayMode("grayscale");
 		//for each channel perform the measurement and update the results table with "channel" and "MeasurementType" --> raw
-		for (ch = 1; ch <= 3; ch++) {
+		for (ch = 1; ch <= 2; ch++) {
 		    Stack.setChannel(ch);         // Set the current channel
 		    roiManager("Measure");        // Measure the ROI
 		    setResult("Channel", nResults-1, ch);
@@ -165,7 +157,7 @@ function processFile(input, output, file) {
 		}
 
 		// Now the same for the binary images
-		for (ch = 1; ch <= 3; ch++) {
+		for (ch = 1; ch <= 2; ch++) {
 		    Stack.setChannel(ch);
 		    // threshold function - as done in the previous version using the thresholds defined earlier
 		    setAutoThreshold("Default no-reset");
@@ -186,6 +178,9 @@ function processFile(input, output, file) {
 		
 		// saving the binarized images
 		Stack.setDisplayMode("composite");
+		// change color for saving --> DAPI to blue
+		Stack.setChannel(2);
+		run("Blue");
 		run("Scale Bar...", "width=50 height=[0] thickness=30 font=50 color=White background=None location=[Lower Right] horizontal bold overlay");
 		// add the hotspot annotation to the image
 		roiManager("Select", 0);
@@ -194,16 +189,10 @@ function processFile(input, output, file) {
 		run("Add Selection...");
 		// now save the binary images
 		saveAs("PNG", output+ "binary"+ "_" + filewochannel + "_composite.png");
-		Stack.setActiveChannels("100");
+		Stack.setActiveChannels("10");
 		saveAs("PNG",output+ "binary"+ "_" + filewochannel + "_" + marker1 + ".png");
-		Stack.setActiveChannels("010");
-		saveAs("PNG",output+ "binary"+ "_" + filewochannel + "_" + marker2 + ".png");
-		Stack.setActiveChannels("001");
+		Stack.setActiveChannels("01");
 		saveAs("PNG",output+ "binary"+ "_" + filewochannel + "_" + "DAPI" + ".png");
-		Stack.setActiveChannels("101");
-		saveAs("PNG",output+ "binary"+ "_" + filewochannel + "_" + marker1 + "_dapi.png");
-		Stack.setActiveChannels("011");
-		saveAs("PNG",output+ "binary"+ "_" + filewochannel + "_" + marker2 + "_dapi.png");
     }
     saveAs("Results", output+  condition + "_measurement.csv");
    	
